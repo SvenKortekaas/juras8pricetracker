@@ -1,7 +1,7 @@
-name: Jura S8 Price Tracker (MQTT)
-version: 1.0.0
-slug: jura_s8_price_addon
-description: Scrape prijzen voor Jura S8 bij diverse winkels en publiceer via MQTT Discovery als sensoren met historie.
+name: "Jura S8 Price Tracker (MQTT)"
+version: "1.0.0"
+slug: "jura_s8_price_addon"
+description: "Scrape prijzen voor Jura S8 bij diverse winkels en publiceer via MQTT Discovery als sensoren met historie."
 url: https://github.com/svenkortekaas/jiras8pricetracker/tree/main/jura_s8_price_addon
 arch:
   - amd64
