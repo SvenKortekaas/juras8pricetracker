@@ -1,3 +1,7 @@
+## v0.0.1 (2025-10-26)
+
+- chore: bump manifest.json to v0.0.1 (github-actions[bot])
+
 # 🧾 Changelog
 
 Alle wijzigingen aan de **Jura S8 Price Tracker (MQTT)** add-on worden hier automatisch bijgehouden.
