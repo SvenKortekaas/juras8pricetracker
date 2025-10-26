@@ -1,6 +1,6 @@
 {
   "name": "Jura S8 Price Tracker (MQTT)",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "slug": "jura_s8_price_addon",
   "description": "Scrape prijzen voor Jura S8 bij diverse winkels en publiceer via MQTT Discovery als sensoren met historie.",
   "arch": [
