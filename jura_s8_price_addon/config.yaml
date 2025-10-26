@@ -1,4 +1,4 @@
-name: "Jura S8 Price Tracker (MQTT)"
+﻿name: "Jura S8 Price Tracker (MQTT)"
 version: "1.0.0"
 slug: "jura_s8_price_addon"
 description: "Scrape prijzen voor Jura S8 bij diverse winkels en publiceer via MQTT Discovery als sensoren met historie."
@@ -30,50 +30,36 @@ options:
     - id: coolblue
       title: "Coolblue"
       url: "https://www.coolblue.nl/product/947474/jura-s8-piano-black-eb.html"
-      headers:
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Safari/605.1.15"
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
     - id: koffieloods
       title: "Koffie Loods"
       url: "https://www.koffie-loods.nl/jura-koffiemachines/jura-s8-piano-black-eb-gratis-proefpakket"
-      headers: {}
     - id: like2cook
       title: "Like2Cook"
       url: "https://www.like2cook.nl/jura-s8-piano-black-eb-15482"
-      headers: {}
     - id: voskoffie
       title: "Vos Koffie"
       url: "https://www.voskoffie.nl/webshop/jura-assortiment/jura-thuis/jura-s8-piano-black-eb/"
-      headers: {}
     - id: koffiestore
       title: "Koffiestore"
       url: "https://koffiestore.nl/products/jura-s8-piano-black-eb"
-      headers: {}
     - id: dekoffiewinkel
       title: "DeKoffieWinkel"
       url: "https://www.dekoffiewinkel.com/s8-piano-black-eb/"
-      headers: {}
     - id: mediamarkt
       title: "MediaMarkt"
       url: "https://www.mediamarkt.nl/nl/product/_jura-s8-eb-volautomatische-espressomachine-piano-black-1809815.html"
-      headers:
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Safari/605.1.15"
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-    - id: ludiqx
       title: "Ludiqx"
       url: "https://www.ludiqx.nl/products/jura-s8"
-      headers: {}
 
 schema:
   run_time: str?
-  scan_interval: int(30, 86400)
+  scan_interval: int(30,86400)
   base_topic: str
   mqtt_host: str
-  mqtt_port: int
+  mqtt_port: port
   mqtt_username: str?
   mqtt_password: password?
   sites:
     - id: str
       url: url
       title: str?
-      headers: dict?
