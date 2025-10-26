@@ -1,3 +1,7 @@
+## v0.0.5 (2025-10-26)
+
+- chore: bump manifest.json to v0.0.5 (github-actions[bot])
+
 ## v0.0.4 (2025-10-26)
 
 - chore: bump manifest.json to v0.0.4 (github-actions[bot])
