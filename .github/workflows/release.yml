@@ -1,0 +1,91 @@
+name: Automatic Versioning and Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine version bump
+        id: bump
+        run: |
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $latest_tag"
+          IFS='.' read -r major minor patch <<<"${latest_tag#v}"
+          commit_message=$(git log -1 --pretty=%s)
+
+          if [[ "$commit_message" == *"#major"* ]]; then
+            major=$((major+1)); minor=0; patch=0
+          elif [[ "$commit_message" == *"#minor"* ]]; then
+            minor=$((minor+1)); patch=0
+          else
+            patch=$((patch+1))
+          fi
+
+          new_tag="v${major}.${minor}.${patch}"
+          echo "NEW_TAG=$new_tag" >> $GITHUB_ENV
+          echo "New tag: $new_tag"
+
+      - name: Update manifest.json version
+        run: |
+          manifest_file=$(find . -type f -name manifest.json || true)
+          if [ -n "$manifest_file" ]; then
+            echo "Updating manifest.json version to ${{ env.NEW_TAG }}"
+            tmpfile=$(mktemp)
+            jq --arg v "${{ env.NEW_TAG }}" '.version = ($v | ltrimstr("v"))' "$manifest_file" > "$tmpfile"
+            mv "$tmpfile" "$manifest_file"
+            git add "$manifest_file"
+            git commit -m "chore: bump manifest.json to ${{ env.NEW_TAG }}" || echo "No changes to commit"
+          else
+            echo "No manifest.json found, skipping..."
+          fi
+
+      - name: Create Git tag
+        run: |
+          git tag ${{ env.NEW_TAG }}
+          git push origin ${{ env.NEW_TAG }}
+
+      - name: Update CHANGELOG.md
+        run: |
+          echo "## ${{ env.NEW_TAG }} ($(date +'%Y-%m-%d'))" >> temp_changelog.txt
+          echo "" >> temp_changelog.txt
+          git log -1 --pretty=format:"- %s (%an)" >> temp_changelog.txt
+          echo "" >> temp_changelog.txt
+          echo "" >> temp_changelog.txt
+          if [ -f CHANGELOG.md ]; then
+            cat CHANGELOG.md >> temp_changelog.txt
+          fi
+          mv temp_changelog.txt CHANGELOG.md
+
+          git add CHANGELOG.md
+          git commit -m "docs: update changelog for ${{ env.NEW_TAG }}" || echo "No changes to commit"
+          git push origin HEAD
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.NEW_TAG }}
+          name: "Release ${{ env.NEW_TAG }}"
+          body: |
+            ### Changes
+            $(git log -1 --pretty=format:"%h %s (%an)")
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
