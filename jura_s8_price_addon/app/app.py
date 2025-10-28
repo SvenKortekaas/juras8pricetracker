@@ -1,13 +1,23 @@
 from __future__ import annotations
-import os, json, re, asyncio, signal
-from dataclasses import dataclass
-from typing import Any
-from datetime import datetime, time as dtime, timedelta
-import httpx
-from bs4 import BeautifulSoup
-import paho.mqtt.client as mqtt
 
-PRICE_RE = re.compile(r"(?<!\d)(?:€\s*|\bEUR\s*)(\d{1,4}(?:[.,]\d{3})*(?:[.,]\d{2})?)", re.IGNORECASE)
+import asyncio
+import json
+import re
+import signal
+from dataclasses import dataclass
+from datetime import datetime, time as dtime, timedelta
+from typing import Any
+
+import httpx
+import paho.mqtt.client as mqtt
+from bs4 import BeautifulSoup
+
+from logging_utils import get_logger, setup_logging
+
+PRICE_RE = re.compile(
+    r"(?<!\d)(?:\u20ac\s*|\bEUR\s*)(\d{1,4}(?:[.,]\d{3})*(?:[.,]\d{2})?)",
+    re.IGNORECASE,
+)
 META_HINTS = [
     ('meta[property="product:price:amount"]', "content"),
     ('meta[name="twitter:data1"]', "content"),
@@ -23,6 +33,7 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/127.0 Safari/537.36"
 )
 
+
 @dataclass
 class Site:
     id: str
@@ -30,32 +41,52 @@ class Site:
     title: str | None
     headers: dict[str, str]
 
+
 class App:
     def __init__(self, options: dict[str, Any]):
+        self.logger = get_logger("addon").bind(component="app")
         self.scan_interval = int(options.get("scan_interval", 1800))
         self.run_time_str = options.get("run_time")
         self.run_time: dtime | None = None
         if self.run_time_str:
             try:
-                h, m = map(int, self.run_time_str.split(":"))
-                self.run_time = dtime(h, m)
+                hours, minutes = map(int, self.run_time_str.split(":"))
+                self.run_time = dtime(hours, minutes)
             except Exception:
-                print(f"[addon] Ongeldige tijd in run_time: {self.run_time_str} - gebruik HH:MM")
+                self.logger.warning(
+                    "Invalid run_time value; expected HH:MM.",
+                    extra={"run_time": self.run_time_str},
+                )
 
         self.base_topic = options.get("base_topic", "jura_s8").strip().strip("/")
+        self.logger = self.logger.bind(base_topic=self.base_topic)
+
         self.mqtt_host = options.get("mqtt_host", "core-mosquitto")
         self.mqtt_port = int(options.get("mqtt_port", 1883))
         self.mqtt_username = options.get("mqtt_username") or None
         self.mqtt_password = options.get("mqtt_password") or None
         self.min_price = try_float(options.get("min_price")) or 0.0
         self.max_price = try_float(options.get("max_price")) or 1e9
-        self.sites = [Site(s["id"], s["url"], s.get("title"), s.get("headers", {}))
-                      for s in options.get("sites", [])]
+        self.sites = [
+            Site(s["id"], s["url"], s.get("title"), s.get("headers", {}))
+            for s in options.get("sites", [])
+        ]
 
-        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"{self.base_topic}_addon")
+        self.client = mqtt.Client(
+            mqtt.CallbackAPIVersion.VERSION2, client_id=f"{self.base_topic}_addon"
+        )
         if self.mqtt_username:
             self.client.username_pw_set(self.mqtt_username, self.mqtt_password or "")
-        self.client.connect(self.mqtt_host, self.mqtt_port, keepalive=60)
+        self.client.enable_logger(get_logger("addon.mqtt").logger)
+        try:
+            self.client.connect(self.mqtt_host, self.mqtt_port, keepalive=60)
+        except Exception as exc:
+            self.logger.error(
+                "Failed to connect to MQTT broker.",
+                extra={"mqtt_host": self.mqtt_host, "mqtt_port": self.mqtt_port},
+                exc_info=exc,
+            )
+            raise
 
         self.device = {
             "identifiers": [f"{self.base_topic}_addon"],
@@ -63,98 +94,208 @@ class App:
             "manufacturer": "Custom",
             "model": "Home Assistant Add-on",
         }
+        mode = "scheduled" if self.run_time else "interval"
+        self.logger.info(
+            "Application initialised.",
+            extra={
+                "mode": mode,
+                "run_time": self.run_time_str,
+                "scan_interval": self.scan_interval,
+                "sites": len(self.sites),
+                "min_price": self.min_price,
+                "max_price": self.max_price,
+                "mqtt_host": self.mqtt_host,
+                "mqtt_port": self.mqtt_port,
+            },
+        )
 
     def publish_discovery(self, site: Site):
         obj_id = f"{self.base_topic}_{site.id}".lower()
         disc_topic = f"homeassistant/sensor/{self.base_topic}/{site.id}/config"
         state_topic = f"{self.base_topic}/state/{site.id}"
-        attr_topic  = f"{self.base_topic}/attr/{site.id}"
+        attr_topic = f"{self.base_topic}/attr/{site.id}"
         payload = {
-            "name": f"Jura S8 – {site.title or site.id}",
+            "name": f"Jura S8 {site.title or site.id}",
             "unique_id": obj_id,
             "state_topic": state_topic,
             "json_attributes_topic": attr_topic,
             "device_class": "monetary",
             "state_class": "measurement",
-            "unit_of_measurement": "€",
+            "unit_of_measurement": "\u20ac",
             "value_template": "{{ value_json.price }}",
             "device": self.device,
         }
+        self.logger.debug(
+            "Publishing MQTT discovery payload.",
+            extra={"site": site.id, "topic": disc_topic},
+        )
         self.client.publish(disc_topic, json.dumps(payload), retain=True, qos=1)
 
     async def scrape_once(self):
+        if not self.sites:
+            self.logger.warning("No sites configured; skipping scrape cycle.")
+            return
+
+        self.logger.info(
+            "Starting scrape cycle.",
+            extra={"site_count": len(self.sites)},
+        )
         async with httpx.AsyncClient(
-            headers={"User-Agent": USER_AGENT, "Accept-Language": "nl-NL,nl;q=0.9,en;q=0.8"},
+            headers={
+                "User-Agent": USER_AGENT,
+                "Accept-Language": "nl-NL,nl;q=0.9,en;q=0.8",
+            },
             follow_redirects=True,
             timeout=25,
         ) as client:
             for site in self.sites:
+                site_logger = self.logger.bind(site=site.id)
                 try:
                     self.publish_discovery(site)
-                    resp = await client.get(site.url, headers={**client.headers, **(site.headers or {})})
+                    site_logger.debug("Fetching page.", extra={"url": site.url})
+                    resp = await client.get(
+                        site.url,
+                        headers={**client.headers, **(site.headers or {})},
+                    )
                     try_alt = resp.status_code in (403, 406)
                     resp.raise_for_status()
                     html = resp.text
                     status = resp.status_code
                     method_hint = "ok"
-                except httpx.HTTPStatusError as e:
+                except httpx.HTTPStatusError as error:
                     if try_alt:
+                        site_logger.warning(
+                            "Received blocking status; retrying with alternate headers.",
+                            extra={"status": error.response.status_code},
+                        )
                         alt_headers = {
-                            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Safari/605.1.15",
+                            "User-Agent": (
+                                "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) "
+                                "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                                "Version/16.5 Safari/605.1.15"
+                            ),
                             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                             "Sec-Fetch-Mode": "navigate",
                         }
-                        r2 = await client.get(site.url, headers={**alt_headers, **(site.headers or {})})
-                        html = r2.text
-                        status = r2.status_code
+                        response_retry = await client.get(
+                            site.url,
+                            headers={**alt_headers, **(site.headers or {})},
+                        )
+                        html = response_retry.text
+                        status = response_retry.status_code
                         method_hint = "retry"
                     else:
-                        self.publish_error(site, f"HTTP {e.response.status_code}")
+                        site_logger.error(
+                            "HTTP request failed after retries.",
+                            extra={"status": error.response.status_code},
+                        )
+                        self.publish_error(site, f"HTTP {error.response.status_code}")
                         continue
-                except Exception as ex:
-                    self.publish_error(site, f"{type(ex).__name__}: {ex}")
+                except Exception as exc:
+                    site_logger.exception(
+                        "Unexpected exception while fetching site.",
+                        extra={"url": site.url},
+                        exc_info=exc,
+                    )
+                    self.publish_error(site, f"{type(exc).__name__}: {exc}")
                     continue
 
                 price, currency, method = extract_price(html)
                 title = derive_title(html) or site.title or site.id
-                # plausibiliteit / correctie
+
                 if price is not None:
                     if not (self.min_price <= price <= self.max_price):
-                        # Heuristiek: soms factor 100 of 10 te groot; probeer te repareren
-                        fixed = None
-                        if price / 100.0 >= self.min_price and price / 100.0 <= self.max_price:
+                        fixed: float | None = None
+                        if self.min_price <= price / 100.0 <= self.max_price:
                             fixed = price / 100.0
                             method += "+heuristic_div100"
-                        elif price / 10.0 >= self.min_price and price / 10.0 <= self.max_price:
+                        elif self.min_price <= price / 10.0 <= self.max_price:
                             fixed = price / 10.0
                             method += "+heuristic_div10"
 
                         if fixed is not None:
                             price = fixed
                         else:
-                            self.publish_error(site, "price_out_of_range", extra={
-                                "title": title, "raw_price": price, "min": self.min_price, "max": self.max_price, "method": method
-                            })
+                            site_logger.warning(
+                                "Price outside configured bounds.",
+                                extra={
+                                    "title": title,
+                                    "raw_price": price,
+                                    "method": method,
+                                },
+                            )
+                            self.publish_error(
+                                site,
+                                "price_out_of_range",
+                                extra={
+                                    "title": title,
+                                    "raw_price": price,
+                                    "min": self.min_price,
+                                    "max": self.max_price,
+                                    "method": method,
+                                },
+                            )
                             continue
-                            
-                state_topic = f"{self.base_topic}/state/{site.id}"
-                attr_topic  = f"{self.base_topic}/attr/{site.id}"
+                else:
+                    site_logger.warning(
+                        "Failed to detect a price.",
+                        extra={"method": method},
+                    )
 
-                self.client.publish(state_topic, json.dumps({"price": price}), retain=False, qos=0)
-                self.client.publish(attr_topic, json.dumps({
-                    "title": title,
-                    "url": site.url,
-                    "currency": currency or "EUR",
-                    "source_method": method + "+" + method_hint,
-                    "status_code": status
-                }), retain=False, qos=0)
+                state_topic = f"{self.base_topic}/state/{site.id}"
+                attr_topic = f"{self.base_topic}/attr/{site.id}"
+                site_logger.info(
+                    "Publishing price update.",
+                    extra={
+                        "price": price,
+                        "currency": currency or "EUR",
+                        "method": f"{method}+{method_hint}",
+                        "status_code": status,
+                    },
+                )
+                self.client.publish(
+                    state_topic,
+                    json.dumps({"price": price}),
+                    retain=False,
+                    qos=0,
+                )
+                self.client.publish(
+                    attr_topic,
+                    json.dumps(
+                        {
+                            "title": title,
+                            "url": site.url,
+                            "currency": currency or "EUR",
+                            "source_method": f"{method}+{method_hint}",
+                            "status_code": status,
+                        }
+                    ),
+                    retain=False,
+                    qos=0,
+                )
+
+        self.logger.info("Scrape cycle completed.")
 
     def publish_error(self, site: Site, msg: str, extra: dict[str, Any] | None = None):
-        attr_topic  = f"{self.base_topic}/attr/{site.id}"
+        attr_topic = f"{self.base_topic}/attr/{site.id}"
         state_topic = f"{self.base_topic}/state/{site.id}"
-        self.client.publish(state_topic, json.dumps({"price": None}), retain=False, qos=0)
         payload = {"error": msg, **(extra or {})}
-        self.client.publish(attr_topic, json.dumps(payload), retain=False, qos=0)
+        self.logger.error(
+            "Publishing error state.",
+            extra={"site": site.id, "error": msg, **(extra or {})},
+        )
+        self.client.publish(
+            state_topic,
+            json.dumps({"price": None}),
+            retain=False,
+            qos=0,
+        )
+        self.client.publish(
+            attr_topic,
+            json.dumps(payload),
+            retain=False,
+            qos=0,
+        )
 
     async def loop(self):
         while True:
@@ -164,33 +305,40 @@ class App:
                     target = datetime.combine(now.date(), self.run_time)
                     if now >= target:
                         target = target + timedelta(days=1)
-                    wait = (target - now).total_seconds()
-                    print(f"[addon] Volgende geplande run om {target.isoformat(timespec='minutes')}")
-                    await asyncio.sleep(wait)
+                    wait_seconds = (target - now).total_seconds()
+                    self.logger.info(
+                        "Scheduled execution calculated.",
+                        extra={"next_run": target.isoformat(timespec="minutes")},
+                    )
+                    await asyncio.sleep(wait_seconds)
                     await self.scrape_once()
                     continue
-                else:
-                    await self.scrape_once()
-                    await asyncio.sleep(self.scan_interval)
-            except Exception as ex:
-                print(f"[addon] scrape_once error: {ex}")
+                await self.scrape_once()
+                await asyncio.sleep(self.scan_interval)
+            except Exception as exc:
+                self.logger.exception(
+                    "scrape_once raised an exception; backing off.",
+                    exc_info=exc,
+                )
                 await asyncio.sleep(30)
 
-def try_float(v: Any) -> float | None:
-    if v is None:
+
+def try_float(value: Any) -> float | None:
+    if value is None:
         return None
-    s = str(v).strip().replace(" ", "")
-    if "," in s and "." in s:
-        if s.find(".") < s.find(","):
-            s = s.replace(".", "").replace(",", ".")
+    candidate = str(value).strip().replace(" ", "")
+    if "," in candidate and "." in candidate:
+        if candidate.find(".") < candidate.find(","):
+            candidate = candidate.replace(".", "").replace(",", ".")
         else:
-            s = s.replace(",", "")
+            candidate = candidate.replace(",", "")
     else:
-        s = s.replace(".", "").replace(",", ".")
+        candidate = candidate.replace(".", "").replace(",", ".")
     try:
-        return float(s)
+        return float(candidate)
     except Exception:
         return None
+
 
 def extract_price(html: str) -> tuple[float | None, str, str]:
     soup = BeautifulSoup(html, "lxml")
@@ -204,61 +352,63 @@ def extract_price(html: str) -> tuple[float | None, str, str]:
             if not isinstance(obj, dict):
                 continue
             offers = obj.get("offers")
+
             def _as_eur(val) -> float | None:
-                # normale parse
-                v = try_float(val)
-                if v is None:
-                    # string die puur digits is? mogelijk centen
+                parsed = try_float(val)
+                if parsed is None:
                     if isinstance(val, str) and val.isdigit():
-                        iv = int(val)
-                        if iv >= 10000:   # typisch cents (>= 100 euro)
-                            return iv / 100.0
+                        integer_value = int(val)
+                        if integer_value >= 10000:
+                            return integer_value / 100.0
                     return None
-                # Als heel groot en origineel was int/str-digits → mogelijk centen
-                if v >= 10000 and isinstance(val, (int,)) :
-                    return v / 100.0
-                return v
+                if parsed >= 10000 and isinstance(val, int):
+                    return parsed / 100.0
+                return parsed
 
             if isinstance(offers, dict):
                 raw = offers.get("price") or offers.get("lowPrice")
                 currency = offers.get("priceCurrency") or "EUR"
-                val = _as_eur(raw)
-                if val is not None:
-                    return val, currency, "jsonld"
+                converted = _as_eur(raw)
+                if converted is not None:
+                    return converted, currency, "jsonld"
             if "price" in obj:
                 raw = obj.get("price")
-                val = _as_eur(raw)
-                if val is not None:
-                    return val, obj.get("priceCurrency", "EUR"), "jsonld-root"
+                converted = _as_eur(raw)
+                if converted is not None:
+                    return converted, obj.get("priceCurrency", "EUR"), "jsonld-root"
+
     for selector, attr in META_HINTS:
-        el = soup.select_one(selector)
-        if not el:
+        element = soup.select_one(selector)
+        if not element:
             continue
-        raw = (el.get(attr) if attr else el.get_text(" ")).strip()
-        m = PRICE_RE.search(raw)
-        if m:
-            return normalize_euro(m.group(1)), "EUR", f"selector:{selector}"
+        raw_value = (element.get(attr) if attr else element.get_text(" ")).strip()
+        match = PRICE_RE.search(raw_value)
+        if match:
+            return normalize_euro(match.group(1)), "EUR", f"selector:{selector}"
+
     text = soup.get_text(" ", strip=True)
-    candidates = [normalize_euro(m.group(1)) for m in PRICE_RE.finditer(text)]
-    candidates = [c for c in candidates if c is not None]
+    candidates = [normalize_euro(match.group(1)) for match in PRICE_RE.finditer(text)]
+    candidates = [candidate for candidate in candidates if candidate is not None]
     if candidates:
         candidates.sort()
-        return candidates[len(candidates)//2], "EUR", "text-fallback"
+        return candidates[len(candidates) // 2], "EUR", "text-fallback"
     return None, "EUR", "none"
 
+
 def normalize_euro(num: str) -> float | None:
-    s = num.strip().replace(" ", "")
-    if "," in s and "." in s:
-        if s.find(".") < s.find(","):
-            s = s.replace(".", "").replace(",", ".")
+    candidate = num.strip().replace(" ", "")
+    if "," in candidate and "." in candidate:
+        if candidate.find(".") < candidate.find(","):
+            candidate = candidate.replace(".", "").replace(",", ".")
         else:
-            s = s.replace(",", "")
+            candidate = candidate.replace(",", "")
     else:
-        s = s.replace(".", "").replace(",", ".")
+        candidate = candidate.replace(".", "").replace(",", ".")
     try:
-        return float(s)
+        return float(candidate)
     except Exception:
         return None
+
 
 def derive_title(html: str) -> str | None:
     soup = BeautifulSoup(html, "lxml")
@@ -266,21 +416,39 @@ def derive_title(html: str) -> str | None:
         return soup.title.string.strip()
     return None
 
+
 def read_options() -> dict[str, Any]:
-    with open("/data/options.json", "r", encoding="utf-8") as f:
-        return json.load(f)
+    with open("/data/options.json", "r", encoding="utf-8") as handle:
+        return json.load(handle)
+
 
 def main():
     options = read_options()
+    setup_logging(level=options.get("log_level"), logbook=options.get("logbook"))
     app = App(options)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    loop_logger = get_logger("addon.loop")
+
+    def handle_async_exception(loop_obj, context):
+        exc = context.get("exception")
+        message = context.get("message", "Asyncio exception")
+        if exc:
+            loop_logger.error(message, extra={"source": context.get("future")}, exc_info=exc)
+        else:
+            loop_logger.error(message)
+
+    loop.set_exception_handler(handle_async_exception)
+
     def stop_handler(signum, frame):
+        loop_logger.info("Received stop signal; shutting down.", extra={"signal": signum})
         loop.stop()
+
     signal.signal(signal.SIGTERM, stop_handler)
     signal.signal(signal.SIGINT, stop_handler)
     loop.create_task(app.loop())
     loop.run_forever()
+
 
 if __name__ == "__main__":
     main()
