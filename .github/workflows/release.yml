@@ -44,6 +44,7 @@ jobs:
           echo "NEW_TAG=$new_tag" >> $GITHUB_ENV
           echo "New tag: $new_tag"
 
+      # --- Bump manifest.json (al aanwezig) ---
       - name: Update manifest.json version
         run: |
           manifest_file=$(find . -type f -name manifest.json || true)
@@ -58,6 +59,21 @@ jobs:
             echo "No manifest.json found, skipping..."
           fi
 
+      # --- ✅ NIEUW: Bump jura_s8_price_addon/config.yaml ---
+      - name: Update add-on config.yaml version
+        run: |
+          file="jura_s8_price_addon/config.yaml"
+          if [ -f "$file" ]; then
+            ver="${NEW_TAG#v}"
+            echo "Updating $file to version $ver"
+            perl -0777 -pe "s/^version:\s*\"?\d+\.\d+\.\d+\"?/version: \"$ver\"/m" -i "$file"
+            git add "$file"
+            git commit -m "chore: bump add-on config.yaml to ${{ env.NEW_TAG }}" || echo "No changes to commit"
+          else
+            echo "No add-on config.yaml found, skipping..."
+          fi
+
+      # --- Tag na beide bumps, zodat de tag deze bestanden bevat ---
       - name: Create Git tag
         run: |
           git tag ${{ env.NEW_TAG }}
