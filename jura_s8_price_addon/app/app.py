@@ -241,7 +241,8 @@ def read_options() -> dict[str, Any]:
 def main():
     options = read_options()
     app = App(options)
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     def stop_handler(signum, frame):
         loop.stop()
     signal.signal(signal.SIGTERM, stop_handler)
