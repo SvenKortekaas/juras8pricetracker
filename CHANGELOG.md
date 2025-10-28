@@ -1,3 +1,7 @@
+## v0.0.7 (2025-10-28)
+
+- chore: bump add-on config.yaml to v0.0.7 (github-actions[bot])
+
 ## v0.0.6 (2025-10-28)
 
 - chore: bump manifest.json to v0.0.6 (github-actions[bot])
