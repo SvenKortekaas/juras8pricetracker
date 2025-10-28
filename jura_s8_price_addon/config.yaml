@@ -34,7 +34,7 @@ options:
   mqtt_username: ""
   mqtt_password: ""
   min_price: 800
-  max_price: 3000
+  max_price: 2000
   sites:
     - id: coolblue
       title: "Coolblue"
@@ -51,7 +51,6 @@ options:
     - id: koffiestore
       title: "Koffiestore"
       url: "https://koffiestore.nl/products/jura-s8-piano-black-eb"
-      price_divisor: 10
     - id: dekoffiewinkel
       title: "DeKoffieWinkel"
       url: "https://www.dekoffiewinkel.com/s8-piano-black-eb/"
@@ -76,6 +75,8 @@ schema:
   mqtt_port: port
   mqtt_username: str?
   mqtt_password: password?
+  min_price: int
+  max_price: int
   sites:
     - id: str
       url: url
