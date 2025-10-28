@@ -47,6 +47,8 @@ class App:
         self.mqtt_port = int(options.get("mqtt_port", 1883))
         self.mqtt_username = options.get("mqtt_username") or None
         self.mqtt_password = options.get("mqtt_password") or None
+        self.min_price = try_float(options.get("min_price")) or 0.0
+        self.max_price = try_float(options.get("max_price")) or 1e9
         self.sites = [Site(s["id"], s["url"], s.get("title"), s.get("headers", {}))
                       for s in options.get("sites", [])]
 
@@ -115,12 +117,26 @@ class App:
 
                 price, currency, method = extract_price(html)
                 title = derive_title(html) or site.title or site.id
-                if price is None:
-                    self.publish_error(site, "No price found", extra={
-                        "title": title, "status_code": status, "method": method + "+" + method_hint
-                    })
-                    continue
+                # plausibiliteit / correctie
+                if price is not None:
+                    if not (self.min_price <= price <= self.max_price):
+                        # Heuristiek: soms factor 100 of 10 te groot; probeer te repareren
+                        fixed = None
+                        if price / 100.0 >= self.min_price and price / 100.0 <= self.max_price:
+                            fixed = price / 100.0
+                            method += "+heuristic_div100"
+                        elif price / 10.0 >= self.min_price and price / 10.0 <= self.max_price:
+                            fixed = price / 10.0
+                            method += "+heuristic_div10"
 
+                        if fixed is not None:
+                            price = fixed
+                        else:
+                            self.publish_error(site, "price_out_of_range", extra={
+                                "title": title, "raw_price": price, "min": self.min_price, "max": self.max_price, "method": method
+                            })
+                            continue
+                            
                 state_topic = f"{self.base_topic}/state/{site.id}"
                 attr_topic  = f"{self.base_topic}/attr/{site.id}"
 
@@ -179,25 +195,41 @@ def try_float(v: Any) -> float | None:
 def extract_price(html: str) -> tuple[float | None, str, str]:
     soup = BeautifulSoup(html, "lxml")
     for tag in soup.find_all("script", {"type": ["application/ld+json", "application/json"]}):
-        try:
-            data = json.loads(tag.string or "{}")
-        except Exception:
+    try:
+        data = json.loads(tag.string or "{}")
+    except Exception:
+        continue
+    items = data if isinstance(data, list) else [data]
+    for obj in items:
+        if not isinstance(obj, dict):
             continue
-        items = data if isinstance(data, list) else [data]
-        for obj in items:
-            if not isinstance(obj, dict):
-                continue
-            offers = obj.get("offers")
-            if isinstance(offers, dict):
-                price = offers.get("price") or offers.get("lowPrice")
-                currency = offers.get("priceCurrency") or "EUR"
-                val = try_float(price)
-                if val is not None:
-                    return val, currency, "jsonld"
-            if "price" in obj:
-                val = try_float(obj.get("price"))
-                if val is not None:
-                    return val, obj.get("priceCurrency", "EUR"), "jsonld-root"
+        offers = obj.get("offers")
+        def _as_eur(val) -> float | None:
+            # normale parse
+            v = try_float(val)
+            if v is None:
+                # string die puur digits is? mogelijk centen
+                if isinstance(val, str) and val.isdigit():
+                    iv = int(val)
+                    if iv >= 10000:   # typisch cents (>= 100 euro)
+                        return iv / 100.0
+                return None
+            # Als heel groot en origineel was int/str-digits → mogelijk centen
+            if v >= 10000 and isinstance(val, (int,)) :
+                return v / 100.0
+            return v
+
+        if isinstance(offers, dict):
+            raw = offers.get("price") or offers.get("lowPrice")
+            currency = offers.get("priceCurrency") or "EUR"
+            val = _as_eur(raw)
+            if val is not None:
+                return val, currency, "jsonld"
+        if "price" in obj:
+            raw = obj.get("price")
+            val = _as_eur(raw)
+            if val is not None:
+                return val, obj.get("priceCurrency", "EUR"), "jsonld-root"
     for selector, attr in META_HINTS:
         el = soup.select_one(selector)
         if not el:

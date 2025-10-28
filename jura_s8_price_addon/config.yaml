@@ -26,6 +26,8 @@ options:
   mqtt_port: 1883
   mqtt_username: ""
   mqtt_password: ""
+  min_price: 800
+  max_price: 3000
   sites:
     - id: coolblue
       title: "Coolblue"
