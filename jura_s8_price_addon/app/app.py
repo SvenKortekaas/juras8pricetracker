@@ -40,6 +40,7 @@ class Site:
     url: str
     title: str | None
     headers: dict[str, str]
+    price_divisor: float | None = None
 
 
 class App:
@@ -68,7 +69,13 @@ class App:
         self.min_price = try_float(options.get("min_price")) or 0.0
         self.max_price = try_float(options.get("max_price")) or 1e9
         self.sites = [
-            Site(s["id"], s["url"], s.get("title"), s.get("headers", {}))
+            Site(
+                s["id"],
+                s["url"],
+                s.get("title"),
+                s.get("headers", {}),
+                try_float(s.get("price_divisor")) or None,
+            )
             for s in options.get("sites", [])
         ]
 
@@ -204,6 +211,15 @@ class App:
                 title = derive_title(html) or site.title or site.id
 
                 if price is not None:
+                    if site.price_divisor:
+                        if site.price_divisor > 0:
+                            price /= site.price_divisor
+                            method += f"+div{site.price_divisor:g}"
+                        else:
+                            site_logger.warning(
+                                "Configured price_divisor must be greater than 0.",
+                                extra={"price_divisor": site.price_divisor},
+                            )
                     if not (self.min_price <= price <= self.max_price):
                         fixed: float | None = None
                         if self.min_price <= price / 100.0 <= self.max_price:

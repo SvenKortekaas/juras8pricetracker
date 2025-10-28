@@ -12,7 +12,8 @@ Scrapet prijzen voor de **Jura S8 Piano Black EB** bij meerdere NL shops en publ
   - `name`: weergegeven naam van de logboekregel (standaard `Jura S8 Price Tracker`).
   - `entity_id`: optionele entity om aan de logboekregel te koppelen.
   - `include_level`: voeg `[LEVEL]` prefix toe aan logboekberichten (standaard `true`).
-- `sites`: lijst van `{ id, url, title?, headers? }`
+- `sites`: lijst van `{ id, url, title?, headers?, price_divisor? }`
+  - Gebruik `price_divisor` om sites te normaliseren die prijzen in centen of met een factor 10 publiceren.
 
 ### Voorbeeld
 ```yaml
@@ -29,6 +30,9 @@ options:
   sites:
     - id: coolblue
       url: "https://www.coolblue.nl/product/947474/jura-s8-piano-black-eb.html"
+    - id: koffiestore
+      url: "https://koffiestore.nl/products/jura-s8-piano-black-eb"
+      price_divisor: 10
 ```
 
 ## Logboek-integratie
