@@ -1,3 +1,4 @@
 #!/usr/bin/with-contenv bash
-echo "[addon] starting Jura S8 Price Tracker"
-exec python3 /app/app.py
+# shellcheck shell=bash
+echo "[addon] starting Jura S8 Price Tracker (venv)"
+exec /opt/venv/bin/python /app/app.py
