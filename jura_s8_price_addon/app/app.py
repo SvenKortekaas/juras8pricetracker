@@ -195,41 +195,41 @@ def try_float(v: Any) -> float | None:
 def extract_price(html: str) -> tuple[float | None, str, str]:
     soup = BeautifulSoup(html, "lxml")
     for tag in soup.find_all("script", {"type": ["application/ld+json", "application/json"]}):
-    try:
-        data = json.loads(tag.string or "{}")
-    except Exception:
-        continue
-    items = data if isinstance(data, list) else [data]
-    for obj in items:
-        if not isinstance(obj, dict):
+        try:
+            data = json.loads(tag.string or "{}")
+        except Exception:
             continue
-        offers = obj.get("offers")
-        def _as_eur(val) -> float | None:
-            # normale parse
-            v = try_float(val)
-            if v is None:
-                # string die puur digits is? mogelijk centen
-                if isinstance(val, str) and val.isdigit():
-                    iv = int(val)
-                    if iv >= 10000:   # typisch cents (>= 100 euro)
-                        return iv / 100.0
-                return None
-            # Als heel groot en origineel was int/str-digits → mogelijk centen
-            if v >= 10000 and isinstance(val, (int,)) :
-                return v / 100.0
-            return v
+        items = data if isinstance(data, list) else [data]
+        for obj in items:
+            if not isinstance(obj, dict):
+                continue
+            offers = obj.get("offers")
+            def _as_eur(val) -> float | None:
+                # normale parse
+                v = try_float(val)
+                if v is None:
+                    # string die puur digits is? mogelijk centen
+                    if isinstance(val, str) and val.isdigit():
+                        iv = int(val)
+                        if iv >= 10000:   # typisch cents (>= 100 euro)
+                            return iv / 100.0
+                    return None
+                # Als heel groot en origineel was int/str-digits → mogelijk centen
+                if v >= 10000 and isinstance(val, (int,)) :
+                    return v / 100.0
+                return v
 
-        if isinstance(offers, dict):
-            raw = offers.get("price") or offers.get("lowPrice")
-            currency = offers.get("priceCurrency") or "EUR"
-            val = _as_eur(raw)
-            if val is not None:
-                return val, currency, "jsonld"
-        if "price" in obj:
-            raw = obj.get("price")
-            val = _as_eur(raw)
-            if val is not None:
-                return val, obj.get("priceCurrency", "EUR"), "jsonld-root"
+            if isinstance(offers, dict):
+                raw = offers.get("price") or offers.get("lowPrice")
+                currency = offers.get("priceCurrency") or "EUR"
+                val = _as_eur(raw)
+                if val is not None:
+                    return val, currency, "jsonld"
+            if "price" in obj:
+                raw = obj.get("price")
+                val = _as_eur(raw)
+                if val is not None:
+                    return val, obj.get("priceCurrency", "EUR"), "jsonld-root"
     for selector, attr in META_HINTS:
         el = soup.select_one(selector)
         if not el:
