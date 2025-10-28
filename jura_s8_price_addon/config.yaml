@@ -51,6 +51,7 @@ options:
     - id: koffiestore
       title: "Koffiestore"
       url: "https://koffiestore.nl/products/jura-s8-piano-black-eb"
+      price_divisor: 10
     - id: dekoffiewinkel
       title: "DeKoffieWinkel"
       url: "https://www.dekoffiewinkel.com/s8-piano-black-eb/"
@@ -79,3 +80,4 @@ schema:
     - id: str
       url: url
       title: str?
+      price_divisor: float?
