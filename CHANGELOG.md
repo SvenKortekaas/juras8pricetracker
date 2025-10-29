@@ -1,3 +1,7 @@
+## v0.0.15 (2025-10-29)
+
+- chore: bump add-on config.yaml to v0.0.15 (github-actions[bot])
+
 ## v0.0.14 (2025-10-28)
 
 - chore: bump add-on config.yaml to v0.0.14 (github-actions[bot])
