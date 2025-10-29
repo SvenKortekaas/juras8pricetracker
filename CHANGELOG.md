@@ -1,5 +1,8 @@
-# Changelog
-All notable changes to this project are documented in this file.
+## v0.0.15 (2025-10-29)
+
+- chore: bump add-on config.yaml to v0.0.15 (github-actions[bot])
+
+## v0.0.14 (2025-10-28)
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
