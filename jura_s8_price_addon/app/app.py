@@ -440,7 +440,7 @@ def read_options() -> dict[str, Any]:
 
 def main():
     options = read_options()
-    setup_logging(level=options.get("log_level"), logbook=options.get("logbook"))
+    setup_logging(level=options.get("log_level"))
     app = App(options)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

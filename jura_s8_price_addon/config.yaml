@@ -14,7 +14,7 @@ panel_icon: mdi:coffee
 map:
   - config:rw
 ingress: false
-homeassistant_api: true
+homeassistant_api: false
 
 options:
   # Kies EEN van beide: run_time OF scan_interval
@@ -23,12 +23,6 @@ options:
   scan_interval: 1800
   base_topic: jura_s8
   log_level: info
-  logbook:
-    enabled: false
-    level: warning
-    name: "Jura S8 Price Tracker"
-    entity_id: ""
-    include_level: true
   mqtt_host: "core-mosquitto"
   mqtt_port: 1883
   mqtt_username: ""
@@ -65,12 +59,6 @@ schema:
   scan_interval: int(30,86400)
   base_topic: str
   log_level: str?
-  logbook:
-    enabled: bool?
-    level: str?
-    name: str?
-    entity_id: str?
-    include_level: bool?
   mqtt_host: str
   mqtt_port: port
   mqtt_username: str?
