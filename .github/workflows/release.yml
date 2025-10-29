@@ -29,6 +29,7 @@ jobs:
         run: |
           latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $latest_tag"
+          echo "LATEST_TAG=$latest_tag" >> $GITHUB_ENV
           IFS='.' read -r major minor patch <<<"${latest_tag#v}"
           commit_message=$(git log -1 --pretty=%s)
 
@@ -79,19 +80,14 @@ jobs:
           git tag ${{ env.NEW_TAG }}
           git push origin ${{ env.NEW_TAG }}
 
-      - name: Update CHANGELOG.md
+      - name: Update changelog files
         run: |
-          echo "## ${{ env.NEW_TAG }} ($(date +'%Y-%m-%d'))" >> temp_changelog.txt
-          echo "" >> temp_changelog.txt
-          git log -1 --pretty=format:"- %s (%an)" >> temp_changelog.txt
-          echo "" >> temp_changelog.txt
-          echo "" >> temp_changelog.txt
-          if [ -f CHANGELOG.md ]; then
-            cat CHANGELOG.md >> temp_changelog.txt
-          fi
-          mv temp_changelog.txt CHANGELOG.md
-
-          git add CHANGELOG.md
+          python scripts/update_changelog.py \
+            --new-tag "${{ env.NEW_TAG }}" \
+            --previous-tag "${{ env.LATEST_TAG }}" \
+            --date "$(date +'%Y-%m-%d')" \
+            --files CHANGELOG.md jura_s8_price_addon/CHANGELOG.md
+          git add CHANGELOG.md jura_s8_price_addon/CHANGELOG.md
           git commit -m "docs: update changelog for ${{ env.NEW_TAG }}" || echo "No changes to commit"
           git push origin HEAD
 
