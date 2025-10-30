@@ -4,6 +4,7 @@ import asyncio
 import json
 import re
 import signal
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, time as dtime, timedelta
 from typing import Any
@@ -44,8 +45,9 @@ class Site:
 
 
 class App:
-    def __init__(self, options: dict[str, Any]):
+    def __init__(self, options: dict[str, Any], loop: asyncio.AbstractEventLoop):
         self.logger = get_logger("addon").bind(component="app")
+        self.loop = loop
         self.scan_interval = int(options.get("scan_interval", 1800))
         self.run_time_str = options.get("run_time")
         self.run_time: dtime | None = None
@@ -61,6 +63,9 @@ class App:
 
         self.base_topic = options.get("base_topic", "jura_s8").strip().strip("/")
         self.logger = self.logger.bind(base_topic=self.base_topic)
+
+        self.force_command_topic = f"{self.base_topic}/command/refresh"
+        self.refresh_discovery_topic = f"homeassistant/button/{self.base_topic}/refresh/config"
 
         self.mqtt_host = options.get("mqtt_host", "core-mosquitto")
         self.mqtt_port = int(options.get("mqtt_port", 1883))
@@ -79,12 +84,18 @@ class App:
             for s in options.get("sites", [])
         ]
 
+        self.force_event: asyncio.Event | None = None
+        self.scrape_lock: asyncio.Lock | None = None
+        self._pending_force_requests = 0
+
         self.client = mqtt.Client(
             mqtt.CallbackAPIVersion.VERSION2, client_id=f"{self.base_topic}_addon"
         )
         if self.mqtt_username:
             self.client.username_pw_set(self.mqtt_username, self.mqtt_password or "")
         self.client.enable_logger(get_logger("addon.mqtt").logger)
+        self.client.on_connect = self._handle_connect
+        self.client.on_message = self._handle_message
         try:
             self.client.connect(self.mqtt_host, self.mqtt_port, keepalive=60)
         except Exception as exc:
@@ -94,6 +105,7 @@ class App:
                 exc_info=exc,
             )
             raise
+        self.client.loop_start()
 
         self.device = {
             "identifiers": [f"{self.base_topic}_addon"],
@@ -115,6 +127,7 @@ class App:
                 "mqtt_port": self.mqtt_port,
             },
         )
+        self.publish_refresh_button_discovery()
 
     def publish_discovery(self, site: Site):
         obj_id = f"{self.base_topic}_{site.id}".lower()
@@ -137,6 +150,27 @@ class App:
             extra={"site": site.id, "topic": disc_topic},
         )
         self.client.publish(disc_topic, json.dumps(payload), retain=True, qos=1)
+
+    def publish_refresh_button_discovery(self):
+        payload = {
+            "name": "Jura S8 Price Refresh",
+            "unique_id": f"{self.base_topic}_refresh_button",
+            "command_topic": self.force_command_topic,
+            "payload_press": "PRESS",
+            "device": self.device,
+            "icon": "mdi:update",
+            "entity_category": "config",
+        }
+        self.logger.debug(
+            "Publishing MQTT discovery payload for refresh button.",
+            extra={"topic": self.refresh_discovery_topic},
+        )
+        self.client.publish(
+            self.refresh_discovery_topic,
+            json.dumps(payload),
+            retain=True,
+            qos=1,
+        )
 
     async def scrape_once(self):
         if not self.sites:
@@ -313,7 +347,94 @@ class App:
             qos=0,
         )
 
+    def _handle_connect(
+        self,
+        client: mqtt.Client,
+        userdata,
+        flags,
+        reason_code: mqtt.ReasonCodes,
+        properties=None,
+    ):
+        self.logger.info(
+            "Connected to MQTT broker.",
+            extra={"reason_code": int(reason_code), "command_topic": self.force_command_topic},
+        )
+        result, mid = client.subscribe(self.force_command_topic, qos=1)
+        if result != mqtt.MQTT_ERR_SUCCESS:
+            self.logger.error(
+                "Failed to subscribe to refresh command topic.",
+                extra={"result": result, "mid": mid, "topic": self.force_command_topic},
+            )
+        else:
+            self.logger.debug(
+                "Subscribed to refresh command topic.",
+                extra={"mid": mid, "topic": self.force_command_topic},
+            )
+
+    def _handle_message(self, client: mqtt.Client, userdata, message: mqtt.MQTTMessage):
+        topic = message.topic
+        if topic != self.force_command_topic:
+            return
+        payload = (message.payload or b"").decode("utf-8", errors="ignore").strip()
+        self.logger.info(
+            "Force refresh command received.",
+            extra={"payload": payload or "<empty>"},
+        )
+        try:
+            self.loop.call_soon_threadsafe(self._apply_force_request)
+        except RuntimeError:
+            # Loop already closed; ignore.
+            self.logger.warning(
+                "Async loop closed; ignoring force refresh command.",
+            )
+
+    def _apply_force_request(self):
+        if self.force_event is not None:
+            self.force_event.set()
+        else:
+            self._pending_force_requests += 1
+
+    async def _run_scrape(self, reason: str):
+        if self.scrape_lock is None:
+            self.scrape_lock = asyncio.Lock()
+        async with self.scrape_lock:
+            if reason == "force":
+                self.logger.info("Executing scrape in response to MQTT refresh request.")
+            await self.scrape_once()
+
+    async def _wait_for_force(self, timeout: float) -> bool:
+        if self.force_event is None:
+            self.force_event = asyncio.Event()
+        if self.force_event.is_set():
+            self.force_event.clear()
+            return True
+        if timeout <= 0:
+            return False
+        sleep_task = asyncio.create_task(asyncio.sleep(timeout))
+        force_task = asyncio.create_task(self.force_event.wait())
+        done, pending = await asyncio.wait(
+            {sleep_task, force_task}, return_when=asyncio.FIRST_COMPLETED
+        )
+        if force_task in done:
+            self.force_event.clear()
+            sleep_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await sleep_task
+            return True
+        force_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await force_task
+        return False
+
     async def loop(self):
+        if self.force_event is None:
+            self.force_event = asyncio.Event()
+        if self._pending_force_requests:
+            self.force_event.set()
+            self._pending_force_requests = 0
+        if self.scrape_lock is None:
+            self.scrape_lock = asyncio.Lock()
+
         while True:
             try:
                 if self.run_time:
@@ -326,11 +447,17 @@ class App:
                         "Scheduled execution calculated.",
                         extra={"next_run": target.isoformat(timespec="minutes")},
                     )
-                    await asyncio.sleep(wait_seconds)
-                    await self.scrape_once()
+                    if await self._wait_for_force(wait_seconds):
+                        await self._run_scrape(reason="force")
+                        continue
+                    await self._run_scrape(reason="scheduled")
                     continue
-                await self.scrape_once()
-                await asyncio.sleep(self.scan_interval)
+                await self._run_scrape(reason="scheduled")
+                while True:
+                    if await self._wait_for_force(self.scan_interval):
+                        await self._run_scrape(reason="force")
+                    else:
+                        break
             except Exception as exc:
                 self.logger.exception(
                     "scrape_once raised an exception; backing off.",
@@ -441,9 +568,9 @@ def read_options() -> dict[str, Any]:
 def main():
     options = read_options()
     setup_logging(level=options.get("log_level"))
-    app = App(options)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    app = App(options, loop)
     loop_logger = get_logger("addon.loop")
 
     def handle_async_exception(loop_obj, context):
@@ -458,6 +585,8 @@ def main():
 
     def stop_handler(signum, frame):
         loop_logger.info("Received stop signal; shutting down.", extra={"signal": signum})
+        with suppress(Exception):
+            app.client.loop_stop()
         loop.stop()
 
     signal.signal(signal.SIGTERM, stop_handler)

@@ -26,3 +26,7 @@ options:
 ```
 
 Gebruik `log_level: debug` voor uitgebreide foutopsporing in de add-on logviewer.
+
+## Handmatige refresh
+- De add-on publiceert een MQTT-knop (`Jura S8 Price Refresh`) via Home Assistant MQTT Discovery onder `button`.
+- Druk op de knop of stuur het bericht `PRESS` naar `<base_topic>/command/refresh` om direct een nieuwe scrape-cyclus te starten.
