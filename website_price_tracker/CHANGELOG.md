@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.19] - 2025-10-30
+### Changed
+- website_price_tracker/app/app.py (line 64) now accepts an optional product_name, defaults to “Website Price Tracker”, binds it into logging, discovery payloads, and the MQTT refresh button so every entity reads <product_name> … instead of the former Jura wording, while keeping the manual refresh workflow intact. website_price_tracker/config.yaml (line 1) / website_price_tracker/manifest.json (line 1) rebrand the add-on to “Website Price Tracker (MQTT)”, bump to v1.0.0, switch the default base topic to price_tracker, expose product_name in the schema, and use a neutral icon; the sample site list is now generic. website_price_tracker/rootfs/etc/services.d/app/run and …/finish print the new add-on name during start/stop, matching the device details advertised to MQTT. Repository metadata and docs (README.md (line 1), website_price_tracker/README.md (line 1), repository.yaml (line 1)) were rewritten around the general-purpose scope and now reference the suggested GitHub repo name mqtt-website-price-tracker. CI and changelogs (.github/workflows/release.yml (line 41), CHANGELOG.md (line 1), website_price_tracker/CHANGELOG.md (line 1)) track the renamed folder, new version, and document the rebrand plus dynamic refresh button naming. #major (Sven Kortekaas)
 ## [1.0.0] - 2025-10-30
 ### Changed
 - Generalised the add-on to “Website Price Tracker (MQTT)” with configurable product naming, neutral defaults and broader site examples.
@@ -82,21 +85,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release with MQTT-based price scraping for the Jura S8 across multiple Dutch retailers.
 - Publish MQTT Discovery sensors including price history for Home Assistant dashboards.
 
-[Unreleased]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.17...v1.0.0
-[0.0.17]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.16...v0.0.17
-[0.0.16]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.15...v0.0.16
-[0.0.14]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.13...v0.0.14
-[0.0.13]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.12...v0.0.13
-[0.0.12]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.11...v0.0.12
-[0.0.11]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.10...v0.0.11
-[0.0.10]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.9...v0.0.10
-[0.0.9]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.8...v0.0.9
-[0.0.8]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.7...v0.0.8
-[0.0.7]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.6...v0.0.7
-[0.0.6]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.5...v0.0.6
-[0.0.5]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.4...v0.0.5
-[0.0.4]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.3...v0.0.4
-[0.0.3]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.2...v0.0.3
-[0.0.2]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/compare/v0.0.1...v0.0.2
-[0.0.1]: https://github.com/SvenKortekaas/mqtt-website-price-tracker/releases/tag/v0.0.1
+[Unreleased]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.19...HEAD
+[0.0.19]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.18...v0.0.19
+[0.0.18]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.17...v0.0.18
+[0.0.17]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.16...v0.0.17
+[0.0.16]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.15...v0.0.16
+[0.0.15]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.14...v0.0.15
+[0.0.14]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.13...v0.0.14
+[0.0.13]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.12...v0.0.13
+[0.0.12]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.11...v0.0.12
+[0.0.11]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.10...v0.0.11
+[0.0.10]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.9...v0.0.10
+[0.0.9]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.8...v0.0.9
+[0.0.8]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.7...v0.0.8
+[0.0.7]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.6...v0.0.7
+[0.0.6]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.5...v0.0.6
+[0.0.5]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.4...v0.0.5
+[0.0.4]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.3...v0.0.4
+[0.0.3]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.2...v0.0.3
+[0.0.2]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.1...v0.0.2
+[0.0.1]: https://github.com/SvenKortekaas/juras8pricetracker/releases/tag/v0.0.1
