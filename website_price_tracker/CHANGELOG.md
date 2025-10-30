@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2025-10-30
+### Changed
+- Fix GitHub release workflow indentation and align metadata to version 1.0.2.
+
 ## [1.0.1] - 2025-10-30
 ### Changed
 - Bump add-on manifest and configuration version fields to 1.0.1.

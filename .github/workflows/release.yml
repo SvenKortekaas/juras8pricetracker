@@ -22,28 +22,28 @@ jobs:
         id: version
         run: |
           version=$(python - <<'PY'
-from pathlib import Path
-for line in Path("website_price_tracker/config.yaml").read_text(encoding="utf-8").splitlines():
-    line = line.strip()
-    if line.startswith("version:"):
-        value = line.split(":", 1)[1].strip().strip('"').strip("'")
-        print(value)
-        break
-else:
-    raise SystemExit("version field not found in config.yaml")
-PY
-)
+          from pathlib import Path
+          for line in Path("website_price_tracker/config.yaml").read_text(encoding="utf-8").splitlines():
+              line = line.strip()
+              if line.startswith("version:"):
+                  value = line.split(":", 1)[1].strip().strip('"').strip("'")
+                  print(value)
+                  break
+          else:
+              raise SystemExit("version field not found in config.yaml")
+          PY
+          )
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Ensure manifest version matches
         run: |
           manifest_version=$(python - <<'PY'
-import json
-from pathlib import Path
-data = json.loads(Path("website_price_tracker/manifest.json").read_text(encoding="utf-8"))
-print(data.get("version", ""))
-PY
-)
+          import json
+          from pathlib import Path
+          data = json.loads(Path("website_price_tracker/manifest.json").read_text(encoding="utf-8"))
+          print(data.get("version", ""))
+          PY
+          )
           if [ -z "$manifest_version" ]; then
             echo "Manifest version missing" >&2
             exit 1

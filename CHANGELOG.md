@@ -1,3 +1,7 @@
+## v1.0.2 (2025-10-30)
+
+- fix: correct release workflow YAML and bump metadata to 1.0.2
+
 ## v1.0.1 (2025-10-30)
 
 - chore: bump add-on metadata to version 1.0.1
