@@ -47,7 +47,7 @@ class Site:
 class App:
     def __init__(self, options: dict[str, Any], loop: asyncio.AbstractEventLoop):
         self.logger = get_logger("addon").bind(component="app")
-        self.loop = loop
+        self.async_loop = loop
         self.scan_interval = int(options.get("scan_interval", 1800))
         self.run_time_str = options.get("run_time")
         self.run_time: dtime | None = None
@@ -355,9 +355,19 @@ class App:
         reason_code: mqtt.ReasonCodes,
         properties=None,
     ):
+        reason_value = getattr(reason_code, "value", reason_code)
+        try:
+            reason_int = int(reason_value)
+        except (TypeError, ValueError):
+            reason_int = None
+        reason_name = getattr(reason_code, "name", str(reason_code))
         self.logger.info(
             "Connected to MQTT broker.",
-            extra={"reason_code": int(reason_code), "command_topic": self.force_command_topic},
+            extra={
+                "reason_code": reason_int,
+                "reason_name": reason_name,
+                "command_topic": self.force_command_topic,
+            },
         )
         result, mid = client.subscribe(self.force_command_topic, qos=1)
         if result != mqtt.MQTT_ERR_SUCCESS:
@@ -381,7 +391,7 @@ class App:
             extra={"payload": payload or "<empty>"},
         )
         try:
-            self.loop.call_soon_threadsafe(self._apply_force_request)
+            self.async_loop.call_soon_threadsafe(self._apply_force_request)
         except RuntimeError:
             # Loop already closed; ignore.
             self.logger.warning(
