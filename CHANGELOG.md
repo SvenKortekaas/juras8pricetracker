@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.18] - 2025-10-30
+### Changed
+- On-connect logging now handles Paho’s ReasonCode without forcing it through int(), so the callback no longer crashes, and the MQTT force-refresh thread keeps working without colliding with the coroutine loop. (Sven Kortekaas)
 ## [0.0.17] - 2025-10-30
 ### Added
 - Added an MQTT-discovered refresh button so forcing an update publishes immediately through the scraper loop. (Sven Kortekaas)
@@ -76,7 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release with MQTT-based price scraping for the Jura S8 across multiple Dutch retailers.
 - Publish MQTT Discovery sensors including price history for Home Assistant dashboards.
 
-[Unreleased]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.17...HEAD
+[Unreleased]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.18...HEAD
+[0.0.18]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.17...v0.0.18
 [0.0.17]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.16...v0.0.17
 [0.0.16]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.15...v0.0.16
 [0.0.15]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.14...v0.0.15
