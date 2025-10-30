@@ -1,5 +1,5 @@
 name: "Website Price Tracker (MQTT)"
-version: "1.0.0"
+version: "0.0.19"
 slug: "website_price_tracker"
 description: "Algemene webwinkel-prijsscraper die resultaten via MQTT Discovery publiceert als Home Assistant sensoren."
 url: https://github.com/svenkortekaas/mqtt-website-price-tracker/tree/main/website_price_tracker
