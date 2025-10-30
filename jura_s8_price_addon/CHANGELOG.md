@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Expose an MQTT button (`Jura S8 Price Refresh`) that publishes to `base_topic/command/refresh` to trigger an immediate scrape cycle.
 
+## [0.0.17] - 2025-10-30
+### Added
+- Added an MQTT-discovered refresh button so forcing an update publishes immediately through the scraper loop. (Sven Kortekaas)
 ## [0.0.16] - 2025-10-29
 ### Changed
 - chore: align changelog content and automate release updates #patch (Sven Kortekaas)
@@ -68,7 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release with MQTT-based price scraping for the Jura S8 across multiple Dutch retailers.
 - Publish MQTT Discovery sensors including price history for Home Assistant dashboards.
 
-[Unreleased]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.16...HEAD
+[Unreleased]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.17...HEAD
+[0.0.17]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.16...v0.0.17
 [0.0.16]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.15...v0.0.16
 [0.0.15]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.14...v0.0.15
 [0.0.14]: https://github.com/SvenKortekaas/juras8pricetracker/compare/v0.0.13...v0.0.14
