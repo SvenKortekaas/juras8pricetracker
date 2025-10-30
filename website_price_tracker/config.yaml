@@ -1,0 +1,54 @@
+name: "Website Price Tracker (MQTT)"
+version: "1.0.0"
+slug: "website_price_tracker"
+description: "Algemene webwinkel-prijsscraper die resultaten via MQTT Discovery publiceert als Home Assistant sensoren."
+url: https://github.com/svenkortekaas/mqtt-website-price-tracker/tree/main/website_price_tracker
+arch:
+  - amd64
+  - aarch64
+  - armv7
+startup: services
+init: false
+boot: auto
+panel_icon: mdi:tag-outline
+map:
+  - config:rw
+ingress: false
+homeassistant_api: false
+
+options:
+  # Kies EEN van beide: run_time OF scan_interval
+  # run_time heeft voorrang; formaat HH:MM (24-uurs)
+  run_time: "06:00"
+  scan_interval: 1800
+  product_name: "Website Price Tracker"
+  base_topic: price_tracker
+  log_level: info
+  mqtt_host: "core-mosquitto"
+  mqtt_port: 1883
+  mqtt_username: ""
+  mqtt_password: ""
+  min_price: 0
+  max_price: 100000
+  sites:
+    - id: example_store
+      title: "Example Store"
+      url: "https://www.example.com/products/example-widget"
+
+schema:
+  run_time: str?
+  scan_interval: int(30,86400)
+  product_name: str?
+  base_topic: str
+  log_level: str?
+  mqtt_host: str
+  mqtt_port: port
+  mqtt_username: str?
+  mqtt_password: password?
+  min_price: int
+  max_price: int
+  sites:
+    - id: str
+      url: url
+      title: str?
+      price_divisor: float?

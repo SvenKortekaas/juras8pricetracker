@@ -45,7 +45,6 @@ jobs:
           echo "NEW_TAG=$new_tag" >> $GITHUB_ENV
           echo "New tag: $new_tag"
 
-      # --- Bump manifest.json (al aanwezig) ---
       - name: Update manifest.json version
         run: |
           manifest_file=$(find . -type f -name manifest.json || true)
@@ -60,10 +59,9 @@ jobs:
             echo "No manifest.json found, skipping..."
           fi
 
-      # --- ✅ NIEUW: Bump jura_s8_price_addon/config.yaml ---
       - name: Update add-on config.yaml version
         run: |
-          file="jura_s8_price_addon/config.yaml"
+          file="website_price_tracker/config.yaml"
           if [ -f "$file" ]; then
             ver="${NEW_TAG#v}"
             echo "Updating $file to version $ver"
@@ -74,7 +72,6 @@ jobs:
             echo "No add-on config.yaml found, skipping..."
           fi
 
-      # --- Tag na beide bumps, zodat de tag deze bestanden bevat ---
       - name: Create Git tag
         run: |
           git tag ${{ env.NEW_TAG }}
@@ -86,8 +83,8 @@ jobs:
             --new-tag "${{ env.NEW_TAG }}" \
             --previous-tag "${{ env.LATEST_TAG }}" \
             --date "$(date +'%Y-%m-%d')" \
-            --files CHANGELOG.md jura_s8_price_addon/CHANGELOG.md
-          git add CHANGELOG.md jura_s8_price_addon/CHANGELOG.md
+            --files CHANGELOG.md website_price_tracker/CHANGELOG.md
+          git add CHANGELOG.md website_price_tracker/CHANGELOG.md
           git commit -m "docs: update changelog for ${{ env.NEW_TAG }}" || echo "No changes to commit"
           git push origin HEAD
 

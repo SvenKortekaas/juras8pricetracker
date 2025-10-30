@@ -1,2 +1,0 @@
-#!/usr/bin/with-contenv bash
-echo "[addon] stopping Jura S8 Price Tracker"

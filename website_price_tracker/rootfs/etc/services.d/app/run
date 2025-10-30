@@ -1,4 +1,4 @@
 #!/usr/bin/with-contenv bash
 # shellcheck shell=bash
-echo "[addon] starting Jura S8 Price Tracker (venv)"
+echo "[addon] starting Website Price Tracker (venv)"
 exec /opt/venv/bin/python /app/app.py

@@ -1,0 +1,16 @@
+{
+  "name": "Website Price Tracker (MQTT)",
+  "version": "1.0.0",
+  "slug": "website_price_tracker",
+  "description": "Algemene webwinkel-prijsscraper die resultaten via MQTT Discovery publiceert als Home Assistant sensoren.",
+  "arch": [
+    "amd64",
+    "aarch64",
+    "armv7"
+  ],
+  "startup": "services",
+  "boot": "auto",
+  "panel_icon": "mdi:tag-outline",
+  "homeassistant_api": false,
+  "ingress": false
+}

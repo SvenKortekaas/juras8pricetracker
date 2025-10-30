@@ -61,8 +61,16 @@ class App:
                     extra={"run_time": self.run_time_str},
                 )
 
-        self.base_topic = options.get("base_topic", "jura_s8").strip().strip("/")
-        self.logger = self.logger.bind(base_topic=self.base_topic)
+        raw_product = (options.get("product_name") or "").strip()
+        self.product_name = raw_product or "Website Price Tracker"
+
+        self.base_topic = options.get("base_topic", "price_tracker").strip().strip("/")
+        if not self.base_topic:
+            self.base_topic = "price_tracker"
+        self.logger = self.logger.bind(
+            base_topic=self.base_topic,
+            product_name=self.product_name,
+        )
 
         self.force_command_topic = f"{self.base_topic}/command/refresh"
         self.refresh_discovery_topic = f"homeassistant/button/{self.base_topic}/refresh/config"
@@ -109,7 +117,7 @@ class App:
 
         self.device = {
             "identifiers": [f"{self.base_topic}_addon"],
-            "name": "Jura S8 Price Tracker",
+            "name": self.product_name,
             "manufacturer": "Custom",
             "model": "Home Assistant Add-on",
         }
@@ -125,6 +133,7 @@ class App:
                 "max_price": self.max_price,
                 "mqtt_host": self.mqtt_host,
                 "mqtt_port": self.mqtt_port,
+                "product_name": self.product_name,
             },
         )
         self.publish_refresh_button_discovery()
@@ -135,7 +144,7 @@ class App:
         state_topic = f"{self.base_topic}/state/{site.id}"
         attr_topic = f"{self.base_topic}/attr/{site.id}"
         payload = {
-            "name": f"Jura S8 {site.title or site.id}",
+            "name": f"{self.product_name} {site.title or site.id}",
             "unique_id": obj_id,
             "state_topic": state_topic,
             "json_attributes_topic": attr_topic,
@@ -153,7 +162,7 @@ class App:
 
     def publish_refresh_button_discovery(self):
         payload = {
-            "name": "Jura S8 Price Refresh",
+            "name": f"{self.product_name} Refresh",
             "unique_id": f"{self.base_topic}_refresh_button",
             "command_topic": self.force_command_topic,
             "payload_press": "PRESS",
@@ -409,7 +418,10 @@ class App:
             self.scrape_lock = asyncio.Lock()
         async with self.scrape_lock:
             if reason == "force":
-                self.logger.info("Executing scrape in response to MQTT refresh request.")
+                self.logger.info(
+                    "Executing scrape in response to MQTT refresh request.",
+                    extra={"product_name": self.product_name},
+                )
             await self.scrape_once()
 
     async def _wait_for_force(self, timeout: float) -> bool:

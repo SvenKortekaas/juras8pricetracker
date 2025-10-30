@@ -1,86 +1,52 @@
-# Jura S8 Price Tracker 🏷️
+# Website Price Tracker (MQTT)
 
-Automatische prijs-tracker voor de **Jura S8 Piano Black EB** koffiemachine.
-Ontworpen als **Home Assistant Add-on**, publiceert prijzen van meerdere webshops via **MQTT Discovery** zodat je ze als sensoren kunt volgen, vergelijken en visualiseren.
+General-purpose Home Assistant add-on that scrapes prices from any set of product pages and publishes the results via MQTT Discovery. Use it to monitor availability, compare price histories, or trigger automations across all your favourite shops.
 
-## 🚀 Functies
+## Features
+- Scheduled scraping via fixed `run_time` or repeating `scan_interval`.
+- Optional `product_name` to brand sensors and the manual refresh button per device.
+- MQTT Discovery payloads for sensors (state + attributes) with historical data support.
+- Smart price normalisation, including heuristics for retailers that report values in cents.
+- Manual refresh button exposed over MQTT for on-demand updates.
 
-- 🕓 Dagelijkse scraping (`run_time`) of interval (`scan_interval`)
-- 🛒 Ondersteuning voor o.a. Coolblue, MediaMarkt, De Koffie Winkel, Vos Koffie, Koffie Loods, Koffiestore, Like2Cook, Ludiqx
-- 💬 MQTT-sensoren met Home Assistant Discovery
-- 📈 Historiek + ApexCharts visualisatie
-- 🔁 Automatische GitHub Actions release-flow (semver, changelog, manifest bump)
+## Quick Start
+1. Add this repository to Home Assistant: `https://github.com/svenkortekaas/mqtt-website-price-tracker`.
+2. Install **Website Price Tracker (MQTT)** from the add-on store.
+3. Configure MQTT credentials, `product_name`, and the target sites in the add-on options.
+4. Start the add-on – Home Assistant will discover sensors and the refresh button automatically.
 
-## 🧩 Installatie
-
-1. Voeg deze repository toe aan Home Assistant: `https://github.com/svenkortekaas/jiras8pricetracker`
-2. Installeer **Jura S8 Price Tracker (MQTT)**.
-3. Configureer MQTT en `run_time` of `scan_interval`.
-4. Start de add-on — sensoren verschijnen automatisch.
-
-## ⚙️ Configuratievoorbeeld
-
+## Example Configuration
 ```yaml
 options:
-  run_time: "06:00"          # draait dagelijks om 06:00
-  base_topic: jura_s8
+  product_name: "Nintendo Switch OLED"
+  scan_interval: 2700        # every 45 minutes
+  base_topic: switch_prices
   mqtt_host: core-mosquitto
   mqtt_port: 1883
+  min_price: 200
+  max_price: 450
   sites:
     - id: coolblue
-      url: "https://www.coolblue.nl/product/947474/jura-s8-piano-black-eb.html"
+      title: "Coolblue"
+      url: "https://www.coolblue.nl/product/123456/nintendo-switch-oled.html"
+    - id: mediamarkt
+      title: "MediaMarkt"
+      url: "https://www.mediamarkt.nl/product/p/nintendo-switch-oled-987654"
 ```
 
-> `run_time` heeft voorrang op `scan_interval`.
+## Manual Refresh
+A retained discovery message registers a button entity named `<product_name> Refresh`. Press it (or publish `PRESS` to `<base_topic>/command/refresh`) to force an immediate scrape, regardless of the configured schedule.
 
-## 📊 Dashboard-snippets
-
-### Template-sensor: laagste prijs
-```yaml
-template:
-  - sensor:
-      - name: "Jura S8 – Beste prijs"
-        unit_of_measurement: "€"
-        state: >
-          {% set prices = [
-            states('sensor.jura_s8_coolblue')|float(999999),
-            states('sensor.jura_s8_mediamarkt')|float(999999),
-            states('sensor.jura_s8_dekoffiewinkel')|float(999999)
-          ] %}
-          {{ (prices|min) if prices|min < 999999 else 'unknown' }}
+## Repository Layout
 ```
-
-### ApexCharts-card (HACS)
-```yaml
-type: custom:apexcharts-card
-header:
-  title: Jura S8 – Prijsverloop (30 dagen)
-graph_span: 30d
-series:
-  - entity: sensor.jura_s8_coolblue
-  - entity: sensor.jura_s8_mediamarkt
-  - entity: sensor.jura_s8_dekoffiewinkel
-yaxis:
-  - decimals: 0
-```
-
-## ⚡ Ontwikkeling
-
-```
-jiras8pricetracker/
-├─ repository.json
+.
+├─ README.md
 ├─ CHANGELOG.md
-├─ LICENSE
-├─ jura_s8_price_addon/
-└─ .github/workflows/release.yml
+├─ repository.yaml
+├─ website_price_tracker/   # Home Assistant add-on code
+└─ scripts/
+   └─ update_changelog.py
 ```
 
-### Releases
-- Gebruik `#major`, `#minor`, of niets (patch) in je commitbericht.
-- Voorbeelden:
-  - `feat: nieuwe site toegevoegd #minor`
-  - `fix: verbeterde parser`
-  - `refactor!: breaking changes #major`
-
-## 🪪 Licentie
-Vrijgegeven onder de [MIT License](LICENSE).
+## License
+Released under the [MIT License](LICENSE).
