@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2025-10-30
+### Changed
+- Bump add-on manifest and configuration version fields to 1.0.1.
+
 ## [0.0.19] - 2025-10-30
 ### Changed
 - website_price_tracker/app/app.py (line 64) now accepts an optional product_name, defaults to “Website Price Tracker”, binds it into logging, discovery payloads, and the MQTT refresh button so every entity reads <product_name> … instead of the former Jura wording, while keeping the manual refresh workflow intact. website_price_tracker/config.yaml (line 1) / website_price_tracker/manifest.json (line 1) rebrand the add-on to “Website Price Tracker (MQTT)”, bump to v1.0.0, switch the default base topic to price_tracker, expose product_name in the schema, and use a neutral icon; the sample site list is now generic. website_price_tracker/rootfs/etc/services.d/app/run and …/finish print the new add-on name during start/stop, matching the device details advertised to MQTT. Repository metadata and docs (README.md (line 1), website_price_tracker/README.md (line 1), repository.yaml (line 1)) were rewritten around the general-purpose scope and now reference the suggested GitHub repo name mqtt-website-price-tracker. CI and changelogs (.github/workflows/release.yml (line 41), CHANGELOG.md (line 1), website_price_tracker/CHANGELOG.md (line 1)) track the renamed folder, new version, and document the rebrand plus dynamic refresh button naming. #major (Sven Kortekaas)

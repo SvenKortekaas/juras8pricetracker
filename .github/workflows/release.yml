@@ -1,0 +1,87 @@
+name: Create Release From Version
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from config
+        id: version
+        run: |
+          version=$(python - <<'PY'
+from pathlib import Path
+for line in Path("website_price_tracker/config.yaml").read_text(encoding="utf-8").splitlines():
+    line = line.strip()
+    if line.startswith("version:"):
+        value = line.split(":", 1)[1].strip().strip('"').strip("'")
+        print(value)
+        break
+else:
+    raise SystemExit("version field not found in config.yaml")
+PY
+)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure manifest version matches
+        run: |
+          manifest_version=$(python - <<'PY'
+import json
+from pathlib import Path
+data = json.loads(Path("website_price_tracker/manifest.json").read_text(encoding="utf-8"))
+print(data.get("version", ""))
+PY
+)
+          if [ -z "$manifest_version" ]; then
+            echo "Manifest version missing" >&2
+            exit 1
+          fi
+          if [ "$manifest_version" != "${{ steps.version.outputs.version }}" ]; then
+            echo "Manifest version ($manifest_version) does not match config version (${{ steps.version.outputs.version }})" >&2
+            exit 1
+          fi
+
+      - name: Check if tag exists
+        id: tagcheck
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure Git author
+        if: steps.tagcheck.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create and push tag
+        if: steps.tagcheck.outputs.exists == 'false'
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          git tag "$tag"
+          git push origin "$tag"
+
+      - name: Create GitHub release
+        if: steps.tagcheck.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

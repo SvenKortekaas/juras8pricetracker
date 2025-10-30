@@ -1,3 +1,7 @@
+## v1.0.1 (2025-10-30)
+
+- chore: bump add-on metadata to version 1.0.1
+
 ## v1.0.0 (2025-10-30)
 
 - feat!: generalise add-on to “Website Price Tracker (MQTT)” with configurable naming, refreshed docs and repository metadata
